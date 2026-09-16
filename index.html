@@ -3,19 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>公司内部门户 · 工作台导航</title>
+<title>小渔数科内部门户 · 工作台导航</title>
+<link rel="icon" type="image/png" href="logo.png" />
 <!--
   ══════════════════════════════════════════════════════════════
-  公司内部门户 · 静态导航页
-  如何新增/修改入口：找到下方 SYSTEMS 数组，按格式增删即可
-  {
-    name: '系统名称',
-    desc: '一句话说明',
-    url: 'https://...',      // 跳转地址
-    icon: '🎯',              // 图标（emoji）
-    group: 'core',           // core=核心业务 / support=支撑系统 / plan=筹备中
-    badge: '在线' / '内网' / '筹备中'
-  }
+  小渔数科内部门户 · 静态导航页
+  · 页面上「⚙️ 入口配置」可临时编辑各系统（存浏览器 localStorage）
+  · 永久生效：在配置弹窗点「导出 JSON」，替换下方 SYSTEMS 数组后 push
   ══════════════════════════════════════════════════════════════
 -->
 <style>
@@ -32,6 +26,7 @@
     --green: #34d399;
     --amber: #fbbf24;
     --gray: #6b7280;
+    --danger: #f87171;
     --radius: 16px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -45,22 +40,28 @@
     min-height: 100vh;
   }
   a { text-decoration: none; color: inherit; }
+  button { font-family: inherit; cursor: pointer; }
 
   .wrap { max-width: 1180px; margin: 0 auto; padding: 48px 24px 64px; }
 
   /* ── Header ── */
   header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 40px; flex-wrap: wrap; }
   .brand { display: flex; align-items: center; gap: 14px; }
-  .logo {
-    width: 52px; height: 52px; border-radius: 14px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px; box-shadow: 0 8px 24px rgba(79,124,255,.35);
-  }
+  .logo { width: 56px; height: 56px; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 24px rgba(79,124,255,.35); flex-shrink: 0; }
+  .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .brand h1 { font-size: 22px; letter-spacing: .5px; }
   .brand p { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
+  .header-right { display: flex; align-items: center; gap: 18px; }
   .clock { text-align: right; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
   .clock b { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
+  .btn {
+    padding: 9px 16px; border-radius: 10px; font-size: 13.5px; border: 1px solid var(--border);
+    background: var(--bg-soft); color: var(--text); transition: .2s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; font-weight: 600; }
+  .btn.ghost { background: transparent; color: var(--text-dim); }
+  .btn.danger { background: transparent; border-color: rgba(248,113,113,.4); color: var(--danger); }
 
   /* ── Search ── */
   .search-box { position: relative; margin-bottom: 36px; }
@@ -114,22 +115,74 @@
   .empty { text-align: center; color: var(--text-dim); padding: 48px 0; display: none; }
 
   footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-dim); flex-wrap: wrap; gap: 8px; }
-  footer a { color: var(--accent-2); }
+  footer a { color: var(--accent-2); cursor: pointer; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── Modal ── */
+  .modal-mask {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(5,8,20,.7); backdrop-filter: blur(6px);
+    align-items: flex-start; justify-content: center; padding: 6vh 16px 16px;
+  }
+  .modal-mask.open { display: flex; }
+  .modal {
+    background: var(--bg-soft); border: 1px solid var(--border); border-radius: 18px;
+    width: 100%; max-width: 720px; max-height: 86vh; overflow-y: auto; padding: 28px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.5);
+  }
+  .modal h2 { font-size: 18px; margin-bottom: 6px; }
+  .modal .sub { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* 配置编辑行 */
+  .sys-row { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .sys-row .row-top { display: flex; gap: 8px; margin-bottom: 8px; }
+  .sys-row input, .sys-row select {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .sys-row input:focus, .sys-row select:focus { border-color: var(--accent); }
+  .sys-row .f-name { width: 150px; }
+  .sys-row .f-group { width: 110px; }
+  .sys-row .f-badge { width: 90px; }
+  .sys-row .f-url { flex: 1; min-width: 120px; }
+  .sys-row .f-desc { width: 100%; margin-top: 2px; }
+  .sys-row .del { background: transparent; border: 1px solid rgba(248,113,113,.35); color: var(--danger); border-radius: 8px; padding: 0 10px; font-size: 15px; }
+
+  /* 管理员弹窗 */
+  .admin-box { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+  .admin-box img { width: 220px; height: 220px; border-radius: 14px; background: #fff; padding: 8px; }
+  .admin-info { flex: 1; min-width: 220px; }
+  .admin-info .name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .admin-info .role { color: var(--accent-2); font-size: 13.5px; margin-bottom: 14px; }
+  .admin-info .contact { font-size: 15px; line-height: 2; }
+  .admin-info .contact b { color: var(--accent-2); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(20px);
+    background: var(--card-hover); border: 1px solid var(--accent); color: var(--text);
+    padding: 10px 22px; border-radius: 99px; font-size: 13.5px; opacity: 0; pointer-events: none;
+    transition: .25s; z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="brand">
-      <div class="logo">🐟</div>
+      <div class="logo"><img src="logo.png" alt="小渔数科 logo" /></div>
       <div>
-        <h1>公司内部门户</h1>
+        <h1>小渔数科内部门户</h1>
         <p>业务系统统一入口 · One Portal</p>
       </div>
     </div>
-    <div class="clock">
-      <div><b id="clock-time">--:--:--</b></div>
-      <div id="clock-date">----</div>
+    <div class="header-right">
+      <div class="clock">
+        <div><b id="clock-time">--:--:--</b></div>
+        <div id="clock-date">----</div>
+      </div>
+      <button class="btn" id="btn-config" title="编辑系统入口">⚙️ 入口配置</button>
     </div>
   </header>
 
@@ -142,71 +195,116 @@
   <div class="empty" id="empty">没有匹配的系统，换个关键词试试～</div>
 
   <footer>
-    <span>内部门户 · 仅限公司内部使用</span>
-    <span>入口有变动？联系 <a href="#">管理员</a> 更新本页</span>
+    <span>小渔数科 · 仅限公司内部使用</span>
+    <span>入口有变动？联系 <a id="btn-admin">管理员</a>（<a id="btn-admin2">入口配置</a>）</span>
   </footer>
 </div>
 
+<!-- 管理员联系弹窗 -->
+<div class="modal-mask" id="mask-admin">
+  <div class="modal" style="max-width:560px">
+    <h2>联系管理员</h2>
+    <p class="sub">入口新增 / 链接变更 / 权限申请，请扫码或电话联系</p>
+    <div class="admin-box">
+      <img src="qr-admin.jpg" alt="管理员微信二维码" />
+      <div class="admin-info">
+        <div class="name">Mike</div>
+        <div class="role">小渔数科 · 联合创始人</div>
+        <div class="contact">
+          <div>📱 电话：<b><a href="tel:17811901430" style="color:inherit">17811901430</a></b></div>
+          <div>💬 微信：扫描左侧二维码添加</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn primary" onclick="closeModal('mask-admin')">知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 入口配置弹窗 -->
+<div class="modal-mask" id="mask-config">
+  <div class="modal">
+    <h2>⚙️ 系统入口配置</h2>
+    <p class="sub">
+      保存后立即生效（配置保存在<b>当前浏览器</b>）。要让全员生效：点「导出 JSON」→ 把内容发给管理员 → 替换代码中 SYSTEMS 数组后更新线上。
+    </p>
+    <div id="config-list"></div>
+    <div class="modal-actions" style="justify-content:space-between">
+      <div style="display:flex;gap:10px">
+        <button class="btn" id="btn-add">＋ 新增系统</button>
+        <button class="btn ghost" id="btn-reset">恢复默认</button>
+        <button class="btn ghost" id="btn-export">导出 JSON</button>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn ghost" onclick="closeModal('mask-config')">取消</button>
+        <button class="btn primary" id="btn-save">保存并生效</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
-  // ══════════ 系统入口配置（增删改这里即可）══════════
+  // ══════════ 分组配置 ══════════
   const GROUPS = [
     { key: 'core',    label: '核心业务系统', color: '#4f7cff' },
     { key: 'support', label: '支撑系统',     color: '#22d3ee' },
     { key: 'plan',    label: '筹备中',       color: '#6b7280' },
   ];
+  const BADGES = ['在线', '内网', '筹备中'];
 
-  const SYSTEMS = [
-    // ── 核心业务 ──
-    {
-      name: '运营工作台', icon: '🚀', group: 'core', badge: '内网',
+  // ══════════ 系统入口默认配置（永久生效版本，改这里）══════════
+  const DEFAULT_SYSTEMS = [
+    { name: '运营工作台', icon: '🚀', group: 'core', badge: '内网',
       desc: '闲鱼运营全套工具：选品分析、内容改写、账号运营、爆品方法论',
-      url: 'http://localhost:5180',
-    },
-    {
-      name: '培训内容工作台', icon: '📚', group: 'core', badge: '内网',
+      url: 'http://localhost:5180' },
+    { name: '培训内容工作台', icon: '📚', group: 'core', badge: '内网',
       desc: '知识付费交付协同：售前交接、入班诊断、交付计划、课程体系',
-      url: 'http://localhost:5180/knowledgepay/workspace',
-    },
-    {
-      name: '供应链工作台', icon: '📦', group: 'core', badge: '筹备中',
+      url: 'http://localhost:5180/knowledgepay/workspace' },
+    { name: '供应链工作台', icon: '📦', group: 'core', badge: '筹备中',
       desc: '鲸选供应链 · 三大类目供应链对接与货源管理',
-      url: '#',
-    },
-    // ── 支撑系统 ──
-    {
-      name: '闲鱼运营手册', icon: '📖', group: 'support', badge: '内网',
+      url: '#' },
+    { name: '闲鱼运营手册', icon: '📖', group: 'support', badge: '内网',
       desc: '运营 SOP 手册与团队工作台（本地 SQLite 版）',
-      url: 'http://localhost:5173',
-    },
-    {
-      name: 'Xianyu-OS 知识库', icon: '🧠', group: 'support', badge: '在线',
+      url: 'http://localhost:5173' },
+    { name: 'Xianyu-OS 知识库', icon: '🧠', group: 'support', badge: '在线',
       desc: '运营中心 / Lab / 内容改写 知识系统（线上版）',
-      url: 'https://daiguangjiu.github.io/lab/',
-    },
-    {
-      name: '投放平台（大鱼动力）', icon: '📣', group: 'support', badge: '在线',
+      url: 'https://daiguangjiu.github.io/lab/' },
+    { name: '投放平台（大鱼动力）', icon: '📣', group: 'support', badge: '在线',
       desc: '闲鱼官方推广：超强擦亮、黄金首位、线索通',
-      url: 'https://dayu.goofish.com',
-    },
-    // ── 筹备中 ──
-    {
-      name: '数据看板', icon: '📊', group: 'plan', badge: '筹备中',
+      url: 'https://dayu.goofish.com' },
+    { name: '数据看板', icon: '📊', group: 'plan', badge: '筹备中',
       desc: '出单率、毕业率、账号矩阵数据统一可视化',
-      url: '#',
-    },
-    {
-      name: '客服工单系统', icon: '🎫', group: 'plan', badge: '筹备中',
+      url: '#' },
+    { name: '客服工单系统', icon: '🎫', group: 'plan', badge: '筹备中',
       desc: '学员咨询、售后工单流转与退款预警',
-      url: '#',
-    },
+      url: '#' },
   ];
-  // ═══════════════════════════════════════════════
+
+  const LS_KEY = 'xy_portal_systems_v1';
+  let systems = load();
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_KEY));
+      if (Array.isArray(saved) && saved.length) return saved;
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_SYSTEMS));
+  }
+  function save(systemsArr) {
+    localStorage.setItem(LS_KEY, JSON.stringify(systemsArr));
+  }
 
   const groupsEl = document.getElementById('groups');
   const emptyEl = document.getElementById('empty');
   const searchEl = document.getElementById('search');
-
   const badgeClass = { '在线': 'online', '内网': 'intranet', '筹备中': 'plan' };
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
 
   function render(keyword = '') {
     const kw = keyword.trim().toLowerCase();
@@ -214,8 +312,8 @@
     groupsEl.innerHTML = '';
 
     GROUPS.forEach(g => {
-      const items = SYSTEMS.filter(s => s.group === g.key &&
-        (!kw || (s.name + s.desc).toLowerCase().includes(kw)));
+      const items = systems.filter(s => s.group === g.key &&
+        (!kw || ((s.name || '') + (s.desc || '')).toLowerCase().includes(kw)));
       if (!items.length) return;
       hasAny = true;
 
@@ -231,14 +329,14 @@
         const disabled = s.badge === '筹备中';
         const a = document.createElement('a');
         a.className = 'card' + (disabled ? ' disabled' : '');
-        a.href = s.url;
+        a.href = disabled ? '#' : s.url;
         if (!disabled) a.target = '_blank';
         a.innerHTML = `
-          <div class="emoji">${s.icon}</div>
+          <div class="emoji">${esc(s.icon || '🔗')}</div>
           <div style="flex:1;min-width:0">
-            <h3>${s.name}<span class="badge ${badgeClass[s.badge] || 'plan'}">${s.badge}</span></h3>
-            <p>${s.desc}</p>
-            <div class="url-hint">${s.url === '#' ? '即将上线' : s.url}</div>
+            <h3>${esc(s.name)}<span class="badge ${badgeClass[s.badge] || 'plan'}">${esc(s.badge)}</span></h3>
+            <p>${esc(s.desc)}</p>
+            <div class="url-hint">${s.url === '#' ? '即将上线' : esc(s.url)}</div>
           </div>
           <span class="arrow">›</span>`;
         grid.appendChild(a);
@@ -251,6 +349,90 @@
 
   searchEl.addEventListener('input', e => render(e.target.value));
   render();
+
+  /* ── 弹窗通用 ── */
+  function openModal(id) { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  document.querySelectorAll('.modal-mask').forEach(m =>
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+  document.getElementById('btn-admin').onclick = () => openModal('mask-admin');
+
+  /* ── 入口配置编辑器 ── */
+  let draft = [];
+  const configList = document.getElementById('config-list');
+
+  function openConfig() {
+    draft = JSON.parse(JSON.stringify(systems));
+    renderConfig();
+    openModal('mask-config');
+  }
+  function renderConfig() {
+    configList.innerHTML = '';
+    draft.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'sys-row';
+      row.innerHTML = `
+        <div class="row-top">
+          <input class="f-name" placeholder="名称" value="${esc(s.name)}" />
+          <input class="f-url" placeholder="跳转链接，如 https://..." value="${esc(s.url)}" />
+          <select class="f-group">${GROUPS.map(g =>
+            `<option value="${g.key}" ${s.group===g.key?'selected':''}>${g.label}</option>`).join('')}</select>
+          <select class="f-badge">${BADGES.map(b =>
+            `<option ${s.badge===b?'selected':''}>${b}</option>`).join('')}</select>
+          <button class="del" title="删除">✕</button>
+        </div>
+        <input class="f-desc" placeholder="简要介绍" value="${esc(s.desc)}" />`;
+      row.querySelector('.f-name').oninput = e => draft[i].name = e.target.value;
+      row.querySelector('.f-url').oninput = e => draft[i].url = e.target.value;
+      row.querySelector('.f-desc').oninput = e => draft[i].desc = e.target.value;
+      row.querySelector('.f-group').onchange = e => draft[i].group = e.target.value;
+      row.querySelector('.f-badge').onchange = e => draft[i].badge = e.target.value;
+      row.querySelector('.del').onclick = () => { draft.splice(i, 1); renderConfig(); };
+      configList.appendChild(row);
+    });
+  }
+  document.getElementById('btn-config').onclick = openConfig;
+  document.getElementById('btn-admin2').onclick = openConfig;
+  document.getElementById('btn-add').onclick = () => {
+    draft.push({ name: '新系统', desc: '简要介绍', url: 'https://', group: 'core', badge: '筹备中', icon: '🔗' });
+    renderConfig();
+    configList.lastChild.scrollIntoView({ behavior: 'smooth' });
+  };
+  document.getElementById('btn-reset').onclick = () => {
+    if (!confirm('恢复为默认配置？当前本浏览器的自定义将被清除。')) return;
+    localStorage.removeItem(LS_KEY);
+    systems = JSON.parse(JSON.stringify(DEFAULT_SYSTEMS));
+    render(searchEl.value);
+    closeModal('mask-config');
+    toast('已恢复默认配置');
+  };
+  document.getElementById('btn-save').onclick = () => {
+    systems = draft.filter(s => (s.name || '').trim());
+    save(systems);
+    render(searchEl.value);
+    closeModal('mask-config');
+    toast('已保存，本浏览器立即生效 ✓');
+  };
+  document.getElementById('btn-export').onclick = () => {
+    const json = JSON.stringify(draft, null, 2);
+    const text = 'const DEFAULT_SYSTEMS = ' + json + ';';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => toast('已复制到剪贴板 ✓'),
+        () => showExport(text));
+    } else showExport(text);
+  };
+  function showExport(text) {
+    const w = window.open('', '_blank');
+    w.document.write('<pre style="white-space:pre-wrap;padding:20px;font-size:13px">' + text.replace(/</g,'&lt;') + '</pre>');
+  }
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
 
   // 时钟
   function tick() {
