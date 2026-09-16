@@ -160,6 +160,9 @@
   .sys-row .f-url { flex: 1; min-width: 120px; }
   .sys-row .f-desc { width: 100%; margin-top: 2px; }
   .sys-row .del { background: transparent; border: 1px solid rgba(248,113,113,.35); color: var(--danger); border-radius: 8px; padding: 0 10px; font-size: 15px; }
+  .sys-row .mv { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 8px; padding: 0 9px; font-size: 13px; }
+  .sys-row .mv:hover:not(:disabled) { color: var(--accent-2); border-color: var(--accent-2); }
+  .sys-row .mv:disabled { opacity: .3; cursor: not-allowed; }
 
   /* 管理员弹窗 */
   .admin-box { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
@@ -270,7 +273,7 @@
   <div class="modal">
     <h2>⚙️ 系统入口配置</h2>
     <p class="sub">
-      保存后<b>立即写入云端，所有人打开页面即生效</b>（无需改代码）。「导出 JSON」仅作备份用途。
+      保存后<b>立即写入云端，所有人打开页面即生效</b>（无需改代码）。每条入口右侧 ↑↓ 可调整显示顺序，顺序按保存结果生效。「导出 JSON」仅作备份用途。
     </p>
     <div id="config-list"></div>
     <div class="modal-actions" style="justify-content:space-between">
@@ -440,6 +443,8 @@
             `<option value="${g.key}" ${s.group===g.key?'selected':''}>${g.label}</option>`).join('')}</select>
           <select class="f-badge">${BADGES.map(b =>
             `<option ${s.badge===b?'selected':''}>${b}</option>`).join('')}</select>
+          <button class="mv" data-dir="-1" title="上移" ${i===0?'disabled':''}>↑</button>
+          <button class="mv" data-dir="1" title="下移" ${i===draft.length-1?'disabled':''}>↓</button>
           <button class="del" title="删除">✕</button>
         </div>
         <input class="f-desc" placeholder="简要介绍" value="${esc(s.desc)}" />`;
@@ -448,6 +453,13 @@
       row.querySelector('.f-desc').oninput = e => draft[i].desc = e.target.value;
       row.querySelector('.f-group').onchange = e => draft[i].group = e.target.value;
       row.querySelector('.f-badge').onchange = e => draft[i].badge = e.target.value;
+      row.querySelectorAll('.mv').forEach(btn => btn.onclick = () => {
+        const dir = Number(btn.dataset.dir);
+        const j = i + dir;
+        if (j < 0 || j >= draft.length) return;
+        [draft[i], draft[j]] = [draft[j], draft[i]];
+        renderConfig();
+      });
       row.querySelector('.del').onclick = () => { draft.splice(i, 1); renderConfig(); };
       configList.appendChild(row);
     });
