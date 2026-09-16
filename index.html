@@ -168,6 +168,17 @@
   .admin-info .contact { font-size: 15px; line-height: 2; }
   .admin-info .contact b { color: var(--accent-2); }
 
+  /* 密码门禁 */
+  .pwd-box { display: flex; gap: 10px; }
+  .pwd-box input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none; letter-spacing: 2px;
+  }
+  .pwd-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,124,255,.15); }
+  .pwd-box input.err { border-color: var(--danger); animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-5px);} 50% { transform: translateX(5px);} 75% { transform: translateX(-3px);} }
+  .pwd-error { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 18px; }
+
   .toast {
     position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(20px);
     background: var(--card-hover); border: 1px solid var(--accent); color: var(--text);
@@ -232,6 +243,22 @@
     </div>
     <div class="modal-actions">
       <button class="btn primary" onclick="closeModal('mask-admin')">知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 入口配置 · 密码门禁 -->
+<div class="modal-mask" id="mask-pass">
+  <div class="modal" style="max-width:420px">
+    <h2>🔒 管理入口</h2>
+    <p class="sub">配置页仅限管理员进入，请输入管理密码</p>
+    <div class="pwd-box">
+      <input id="pwd-input" type="password" placeholder="请输入管理密码" autocomplete="off" />
+      <button class="btn primary" id="pwd-ok">进入</button>
+    </div>
+    <div class="pwd-error" id="pwd-error"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('mask-pass')">取消</button>
     </div>
   </div>
 </div>
@@ -406,7 +433,35 @@
       configList.appendChild(row);
     });
   }
-  document.getElementById('btn-config').onclick = openConfig;
+  /* ── 管理密码门禁 ── */
+  const ADMIN_PASS = 'xianyu2026';                    // 管理密码
+  const AUTH_KEY = 'xy_portal_auth';                  // 本会话已验证标记
+  const pwdInput = document.getElementById('pwd-input');
+  const pwdError = document.getElementById('pwd-error');
+
+  function requestConfig() {
+    if (sessionStorage.getItem(AUTH_KEY) === '1') { openConfig(); return; }
+    pwdInput.value = ''; pwdError.textContent = '';
+    openModal('mask-pass');
+    setTimeout(() => pwdInput.focus(), 50);
+  }
+  function tryAuth() {
+    if (pwdInput.value === ADMIN_PASS) {
+      sessionStorage.setItem(AUTH_KEY, '1');
+      closeModal('mask-pass');
+      openConfig();
+    } else {
+      pwdError.textContent = '密码错误，请重试';
+      pwdInput.classList.remove('err');
+      void pwdInput.offsetWidth;                      // 重触发抖动动画
+      pwdInput.classList.add('err');
+      pwdInput.select();
+    }
+  }
+  document.getElementById('pwd-ok').onclick = tryAuth;
+  pwdInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+
+  document.getElementById('btn-config').onclick = requestConfig;
   document.getElementById('btn-add').onclick = () => {
     draft.push({ name: '新系统', desc: '简要介绍', url: 'https://', group: 'core', badge: '筹备中', icon: '🔗' });
     renderConfig();
