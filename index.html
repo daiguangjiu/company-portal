@@ -7,9 +7,9 @@
 <link rel="icon" type="image/png" href="logo.png" />
 <!--
   ══════════════════════════════════════════════════════════════
-  小渔数科内部门户 · 静态导航页
-  · 页面上「⚙️ 入口配置」可临时编辑各系统（存浏览器 localStorage）
-  · 永久生效：在配置弹窗点「导出 JSON」，替换下方 SYSTEMS 数组后 push
+  小渔数科内部门户 · 入口配置存云端数据库（WorkBuddy Cloud）
+  · 「⚙️ 入口配置」→ 输入管理密码 → 编辑保存即写入云端，全员打开页面实时生效
+  · 密码校验在数据库函数 update_portal_config 内完成，前端不持有写权限
   ══════════════════════════════════════════════════════════════
 -->
 <style>
@@ -268,7 +268,7 @@
   <div class="modal">
     <h2>⚙️ 系统入口配置</h2>
     <p class="sub">
-      保存后立即生效（配置保存在<b>当前浏览器</b>）。要让全员生效：点「导出 JSON」→ 把内容发给管理员 → 替换代码中 SYSTEMS 数组后更新线上。
+      保存后<b>立即写入云端，所有人打开页面即生效</b>（无需改代码）。「导出 JSON」仅作备份用途。
     </p>
     <div id="config-list"></div>
     <div class="modal-actions" style="justify-content:space-between">
@@ -287,6 +287,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
 <script>
   // ══════════ 分组配置 ══════════
   const GROUPS = [
@@ -323,17 +324,35 @@
   ];
 
   const LS_KEY = 'xy_portal_systems_v1';
-  let systems = load();
-  function load() {
+
+  // ══════════ 云端配置（保存即全员生效）══════════
+  const cloud = WorkBuddyCloud.createWorkBuddyCloud({
+    endpoint: 'https://xiaoyu-portal.app.workbuddy.host',
+    publishableKey: 'wbpk_fC4teROOTJJwMlBBeuXVtl_x3IsKkeKPsimVp5u31JPNCmfkhRTFaIc',
+  });
+
+  function lsLoad() {
     try {
-      const saved = JSON.parse(localStorage.getItem(LS_KEY));
-      if (Array.isArray(saved) && saved.length) return saved;
-    } catch (e) {}
-    return JSON.parse(JSON.stringify(DEFAULT_SYSTEMS));
+      const s = JSON.parse(localStorage.getItem(LS_KEY));
+      return (Array.isArray(s) && s.length) ? s : null;
+    } catch (e) { return null; }
   }
-  function save(systemsArr) {
-    localStorage.setItem(LS_KEY, JSON.stringify(systemsArr));
-  }
+  function lsSave(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
+
+  let systems = lsLoad() || JSON.parse(JSON.stringify(DEFAULT_SYSTEMS));
+
+  // 启动后异步拉取云端最新配置（云端优先，本地仅作离线兜底）
+  (async () => {
+    try {
+      const { data, error } = await cloud.database
+        .from('portal_config').select('config').eq('id', 1).maybeSingle();
+      if (!error && data && data.config && Array.isArray(data.config.systems) && data.config.systems.length) {
+        systems = data.config.systems;
+        lsSave(systems);
+        render(searchEl.value);
+      }
+    } catch (e) { /* 云端不可达时沿用本地缓存 */ }
+  })();
 
   const groupsEl = document.getElementById('groups');
   const emptyEl = document.getElementById('empty');
@@ -446,6 +465,7 @@
   function tryAuth() {
     if (pwdInput.value === ADMIN_PASS) {
       sessionStorage.setItem(AUTH_KEY, '1');
+      sessionStorage.setItem('xy_portal_pass', pwdInput.value);   // 供云端保存调用
       closeModal('mask-pass');
       openConfig();
     } else {
@@ -466,19 +486,45 @@
     configList.lastChild.scrollIntoView({ behavior: 'smooth' });
   };
   document.getElementById('btn-reset').onclick = () => {
-    if (!confirm('恢复为默认配置？当前本浏览器的自定义将被清除。')) return;
+    if (!confirm('恢复为默认配置？将同时覆盖云端配置（对所有人生效）。')) return;
     localStorage.removeItem(LS_KEY);
     systems = JSON.parse(JSON.stringify(DEFAULT_SYSTEMS));
     render(searchEl.value);
     closeModal('mask-config');
     toast('已恢复默认配置');
+    const pass = sessionStorage.getItem('xy_portal_pass');
+    if (pass) {
+      cloud.database.rpc('update_portal_config', { p_password: pass, p_config: { systems } })
+        .then(({ error }) => { if (error) toast('云端恢复失败，请重新保存一次'); });
+    }
   };
   document.getElementById('btn-save').onclick = () => {
     systems = draft.filter(s => (s.name || '').trim());
-    save(systems);
+    lsSave(systems);
     render(searchEl.value);
-    closeModal('mask-config');
-    toast('已保存，本浏览器立即生效 ✓');
+    const pass = sessionStorage.getItem('xy_portal_pass');
+    if (!pass) {
+      closeModal('mask-config');
+      sessionStorage.removeItem(AUTH_KEY);
+      toast('本机已保存，但需重新输入密码才能同步云端');
+      return;
+    }
+    cloud.database.rpc('update_portal_config', { p_password: pass, p_config: { systems } })
+      .then(({ error }) => {
+        closeModal('mask-config');
+        if (error) {
+          const msg = String(error.message || '');
+          if (msg.includes('BAD_PASSWORD') || error.code === '42501') {
+            sessionStorage.removeItem(AUTH_KEY);
+            sessionStorage.removeItem('xy_portal_pass');
+            toast('密码已变更，请重新通过密码进入配置页');
+          } else {
+            toast('本机已保存，云端同步失败：' + (msg || '网络异常，请重试'));
+          }
+        } else {
+          toast('已保存 ✓ 所有人打开页面即生效');
+        }
+      });
   };
   document.getElementById('btn-export').onclick = () => {
     const json = JSON.stringify(draft, null, 2);
