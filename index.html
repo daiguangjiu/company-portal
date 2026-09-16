@@ -297,31 +297,29 @@
   const BADGES = ['在线', '内网', '筹备中'];
 
   // ══════════ 系统入口默认配置（永久生效版本，改这里）══════════
+  // 2026-09-16 22:43 依用户配置弹窗导出内容固化，替换原 localhost 版本
   const DEFAULT_SYSTEMS = [
-    { name: '运营工作台', icon: '🚀', group: 'core', badge: '内网',
+    { name: '运营工作台', icon: '🚀', group: 'core', badge: '在线',
       desc: '闲鱼运营全套工具：选品分析、内容改写、账号运营、爆品方法论',
-      url: 'http://localhost:5180' },
-    { name: '培训内容工作台', icon: '📚', group: 'core', badge: '内网',
-      desc: '知识付费交付协同：售前交接、入班诊断、交付计划、课程体系',
-      url: 'http://localhost:5180/knowledgepay/workspace' },
+      url: 'https://daiguangjiu.github.io/xianyu-ops-workbench/' },
     { name: '供应链工作台', icon: '📦', group: 'core', badge: '筹备中',
       desc: '鲸选供应链 · 三大类目供应链对接与货源管理',
-      url: '#' },
-    { name: '闲鱼运营手册', icon: '📖', group: 'support', badge: '内网',
-      desc: '运营 SOP 手册与团队工作台（本地 SQLite 版）',
-      url: 'http://localhost:5173' },
-    { name: 'Xianyu-OS 知识库', icon: '🧠', group: 'support', badge: '在线',
+      url: 'https://daiguangjiu.github.io/supply-chain-platform/' },
+    { name: '资料下载', icon: '🔗', group: 'core', badge: '在线',
+      desc: '获客引流资料',
+      url: 'https://xianyu-starter-kit.app.workbuddy.host/' },
+    { name: '内部培训资料', icon: '📚', group: 'support', badge: '在线',
+      desc: '9 大模块 · 30 节精讲 · 6 万字逐字稿 · 14 份配套资料秘籍',
+      url: 'https://daiguangjiu.github.io/xianyu-course/' },
+    { name: '闲鱼运营手册', icon: '📖', group: 'support', badge: '在线',
+      desc: '运营 SOP 手册与团队工作台（知识库版）',
+      url: 'https://daiguangjiu.github.io/xianyu-ops-manual/' },
+    { name: 'Xianyu-OS 知识库', icon: '🧠', group: 'support', badge: '筹备中',
       desc: '运营中心 / Lab / 内容改写 知识系统（线上版）',
       url: 'https://daiguangjiu.github.io/lab/' },
     { name: '投放平台（大鱼动力）', icon: '📣', group: 'support', badge: '在线',
       desc: '闲鱼官方推广：超强擦亮、黄金首位、线索通',
       url: 'https://dayu.goofish.com' },
-    { name: '数据看板', icon: '📊', group: 'plan', badge: '筹备中',
-      desc: '出单率、毕业率、账号矩阵数据统一可视化',
-      url: '#' },
-    { name: '客服工单系统', icon: '🎫', group: 'plan', badge: '筹备中',
-      desc: '学员咨询、售后工单流转与退款预警',
-      url: '#' },
   ];
 
   const LS_KEY = 'xy_portal_systems_v1';
