@@ -52,6 +52,16 @@
   .brand h1 { font-size: 22px; letter-spacing: .5px; }
   .brand p { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
   .header-right { display: flex; align-items: center; gap: 18px; }
+  .vision { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+  .vision-tag {
+    font-size: 11px; color: var(--accent-2); border: 1px solid rgba(34,211,238,.35);
+    background: rgba(34,211,238,.08); padding: 3px 10px; border-radius: 99px; letter-spacing: 2px;
+  }
+  .vision-text {
+    font-size: 17px; font-weight: 600; letter-spacing: 3px;
+    background: linear-gradient(90deg, #7ea2ff, #22d3ee);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
   .clock { text-align: right; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
   .clock b { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
   .btn {
@@ -177,6 +187,10 @@
         <p>业务系统统一入口 · One Portal</p>
       </div>
     </div>
+    <div class="vision">
+      <span class="vision-tag">愿景</span>
+      <span class="vision-text">聚小渔 · 成大市</span>
+    </div>
     <div class="header-right">
       <div class="clock">
         <div><b id="clock-time">--:--:--</b></div>
@@ -196,7 +210,7 @@
 
   <footer>
     <span>小渔数科 · 仅限公司内部使用</span>
-    <span>入口有变动？联系 <a id="btn-admin">管理员</a>（<a id="btn-admin2">入口配置</a>）</span>
+    <span>入口有变动？联系 <a id="btn-admin">管理员</a></span>
   </footer>
 </div>
 
@@ -393,7 +407,6 @@
     });
   }
   document.getElementById('btn-config').onclick = openConfig;
-  document.getElementById('btn-admin2').onclick = openConfig;
   document.getElementById('btn-add').onclick = () => {
     draft.push({ name: '新系统', desc: '简要介绍', url: 'https://', group: 'core', badge: '筹备中', icon: '🔗' });
     renderConfig();
