@@ -115,7 +115,7 @@
     display: flex; align-items: center; justify-content: center;
     background: rgba(79,124,255,.12); border: 1px solid rgba(79,124,255,.2); overflow: hidden;
   }
-  .card .emoji img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card .emoji img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.18); }
 
   /* 角标：NEW / 有更新 */
   .ribbon {
@@ -187,6 +187,14 @@
   .sys-row .f-date { padding: 6px 8px; font-size: 12.5px; }
   .sys-row .f-logo { flex: 1; min-width: 160px; padding: 6px 10px; font-size: 12.5px; }
   .tag-todo { font-size: 11.5px; color: var(--amber); border: 1px dashed rgba(251,191,36,.45); border-radius: 99px; padding: 3px 10px; white-space: nowrap; }
+  .sys-row .gen {
+    background: linear-gradient(135deg, rgba(79,124,255,.18), rgba(34,211,238,.18));
+    border: 1px solid rgba(34,211,238,.45); color: var(--accent-2);
+    border-radius: 99px; padding: 5px 14px; font-size: 12px; white-space: nowrap;
+  }
+  .sys-row .gen:hover { filter: brightness(1.25); }
+  .sys-row .gen:disabled { opacity: .5; }
+  .logo-prev { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: #0b1020; border: 1px solid var(--border); transform: scale(1.15); }
   .sys-row .mv { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 8px; padding: 0 9px; font-size: 13px; }
   .sys-row .mv:hover:not(:disabled) { color: var(--accent-2); border-color: var(--accent-2); }
   .sys-row .mv:disabled { opacity: .3; cursor: not-allowed; }
@@ -300,7 +308,7 @@
   <div class="modal">
     <h2>⚙️ 系统入口配置</h2>
     <p class="sub">
-      保存后<b>立即写入云端，所有人打开页面即生效</b>（无需改代码）。每条入口右侧 ↑↓ 可调整顺序；<b>新增的系统 3 天内自动显示 NEW 角标</b>，其他系统需要提示更新时勾选「有更新」角标；新增系统请补上 logo（可点 ➕ 新增后把系统名发给管理员生成）。
+      保存后<b>立即写入云端，所有人打开页面即生效</b>（无需改代码）。↑↓ 调整顺序；<b>新增系统 3 天内自动显示 NEW 角标</b>，需要提示更新时勾选「有更新」（优先于 NEW 显示）；没有图标的系统点「🎨 AI 生成图标」一键生成，不满意可多点几次换样式。
     </p>
     <div id="config-list"></div>
     <div class="modal-actions" style="justify-content:space-between">
@@ -422,8 +430,9 @@
       ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
-  // 角标判定：新增 3 天内 → NEW；否则若手动标记 → 有更新
+  // 角标判定：手动「有更新」优先（可立即看到）；其次新增 3 天内 → NEW
   function ribbonOf(s) {
+    if (s.hasUpdate) return { cls: 'upd', text: '有更新' };
     if (s.addedAt) {
       const t = new Date(s.addedAt + 'T00:00:00');
       if (!isNaN(t)) {
@@ -431,7 +440,6 @@
         if (days >= 0 && days < NEW_DAYS + 1) return { cls: 'new', text: 'NEW' };
       }
     }
-    if (s.hasUpdate) return { cls: 'upd', text: '有更新' };
     return null;
   }
 
@@ -520,7 +528,9 @@
           <label><input type="checkbox" class="f-upd" ${s.hasUpdate ? 'checked' : ''} />显示「有更新」角标</label>
           <label>添加日期<input type="date" class="f-date" value="${esc(s.addedAt || '')}" /></label>
           <input class="f-logo" placeholder="logo 图片链接（留空用 emoji 图标）" value="${esc(s.logo || '')}" />
-          ${s.logo ? '' : '<span class="tag-todo">🎨 待生成 logo</span>'}
+          ${s.logo
+            ? `<img class="logo-prev" src="${esc(s.logo)}" alt="" onerror="this.style.opacity=.3" />`
+            : `<button class="gen" data-i="${i}">🎨 AI 生成图标</button>`}
         </div>`;
       row.querySelector('.f-name').oninput = e => draft[i].name = e.target.value;
       row.querySelector('.f-url').oninput = e => draft[i].url = e.target.value;
@@ -529,7 +539,13 @@
       row.querySelector('.f-badge').onchange = e => draft[i].badge = e.target.value;
       row.querySelector('.f-upd').onchange = e => draft[i].hasUpdate = e.target.checked;
       row.querySelector('.f-date').onchange = e => draft[i].addedAt = e.target.value;
-      row.querySelector('.f-logo').oninput = e => draft[i].logo = e.target.value.trim();
+      row.querySelector('.f-logo').oninput = e => {
+        draft[i].logo = e.target.value.trim();
+        const prev = row.querySelector('.logo-prev');
+        if (prev) { prev.src = draft[i].logo || ' '; prev.style.opacity = 1; }
+      };
+      const genBtn = row.querySelector('.gen');
+      if (genBtn) genBtn.onclick = () => genLogo(i);
       row.querySelectorAll('.mv').forEach(btn => btn.onclick = () => {
         const dir = Number(btn.dataset.dir);
         const j = i + dir;
@@ -579,6 +595,17 @@
     renderConfig();
     configList.lastChild.scrollIntoView({ behavior: 'smooth' });
   };
+  // AI 生成系统图标（Pollinations 免费生图，按小渔数科 logo 风格）
+  function genLogo(i) {
+    const s = draft[i];
+    const prompt = `flat vector app icon logo for "${s.name}", minimalist geometric symbol, blue to cyan gradient #4F7CFF to #22D3EE, clean smooth lines, no text, centered on solid dark navy background #0B1020, rounded square composition, modern tech style`;
+    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) +
+      '?width=256&height=256&nologo=true&seed=' + Math.floor(Math.random() * 99999);
+    draft[i].logo = url;
+    renderConfig();
+    toast('图标生成中…预览加载出来后满意就点「保存并生效」');
+  }
+
   document.getElementById('btn-reset').onclick = () => {
     if (!confirm('恢复为默认配置？将同时覆盖云端配置（对所有人生效）。')) return;
     localStorage.removeItem(LS_KEY);
