@@ -722,7 +722,11 @@
             toast('✅ 已发送到飞书群，版本号已更新为 ' + version);
           });
         } else {
-          toast('飞书返回错误：' + (res.msg || res.errmsg || JSON.stringify(res)).slice(0, 60));
+          const m = (res.msg || res.errmsg || '').slice(0, 60);
+          const hint = (res.code === 9499 || res.StatusCode === 9499)
+            ? '（多为发送过于频繁被限流，稍等几秒重试即可）'
+            : '';
+          toast('飞书返回错误 code=' + res.code + (m ? '：' + m : '') + hint);
         }
       })
       .catch(() => toast('发送失败：网络异常或 Webhook 地址无效'))
