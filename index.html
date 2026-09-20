@@ -195,6 +195,19 @@
   .sys-row .gen:hover { filter: brightness(1.25); }
   .sys-row .gen:disabled { opacity: .5; }
   .logo-prev { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: #0b1020; border: 1px solid var(--border); transform: scale(1.15); }
+
+  /* 飞书通知弹窗 */
+  .f-field { margin-top: 12px; }
+  .f-field label { display: block; font-size: 12.5px; color: var(--text-dim); margin-bottom: 6px; }
+  .f-field input, .f-field textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 10px 14px; font-size: 14px; outline: none; font-family: inherit;
+  }
+  .f-field input:focus, .f-field textarea:focus { border-color: var(--accent); }
+  .f-field textarea { min-height: 110px; resize: vertical; line-height: 1.7; }
+  .f-field .chk { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text); cursor: pointer; }
+  .f-2col { display: flex; gap: 12px; }
+  .f-2col .f-field { flex: 1; }
   .sys-row .mv { background: transparent; border: 1px solid var(--border); color: var(--text-dim); border-radius: 8px; padding: 0 9px; font-size: 13px; }
   .sys-row .mv:hover:not(:disabled) { color: var(--accent-2); border-color: var(--accent-2); }
   .sys-row .mv:disabled { opacity: .3; cursor: not-allowed; }
@@ -259,9 +272,12 @@
   <div class="empty" id="empty">没有匹配的系统，换个关键词试试～</div>
 
   <footer>
-    <span>小渔数科 · 仅限公司内部使用</span>
+    <span>小渔数科 · 仅限公司内部使用 · <b id="ver-span" style="color:var(--accent-2)">v1.6.0</b></span>
     <span>入口有变动？联系 <a id="btn-admin">管理员</a></span>
-    <button class="btn" id="btn-config" title="编辑系统入口">⚙️ 入口配置</button>
+    <span style="display:flex;gap:10px">
+      <button class="btn" id="btn-feishu" title="发更新通知到飞书群">📣 飞书通知</button>
+      <button class="btn" id="btn-config" title="编辑系统入口">⚙️ 入口配置</button>
+    </span>
   </footer>
 </div>
 
@@ -299,6 +315,36 @@
     <div class="pwd-error" id="pwd-error"></div>
     <div class="modal-actions">
       <button class="btn ghost" onclick="closeModal('mask-pass')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 飞书群通知弹窗 -->
+<div class="modal-mask" id="mask-feishu">
+  <div class="modal" style="max-width:560px">
+    <h2>📣 飞书群更新通知</h2>
+    <p class="sub">
+      在飞书群里添加「自定义机器人」即可获得 Webhook 地址。发送的公告会带上<b>更新内容、版本号、发布时间和门户地址</b>。
+      ⚠️ Webhook 等同于群发信权限，请勿外传；如怀疑泄露，在飞书群更换机器人即可。
+    </p>
+    <div class="f-field">
+      <label>飞书机器人 Webhook 地址</label>
+      <input id="f-webhook" type="url" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx" />
+    </div>
+    <div class="f-field">
+      <label>版本号</label>
+      <input id="f-version" type="text" placeholder="如 v1.6.1" />
+    </div>
+    <div class="f-field">
+      <label>更新内容（将展示在群卡片中）</label>
+      <textarea id="f-note" placeholder="例如：&#10;1. 新增「自营日报入口」和「自营账号台账」；&#10;2. 入口配置支持 AI 生成图标；&#10;3. 修复若干问题。"></textarea>
+    </div>
+    <div class="f-field">
+      <label class="chk"><input type="checkbox" id="f-atall" checked />通知所有人（@所有人）</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="f-save-cfg">💾 只保存 Webhook</button>
+      <button class="btn primary" id="f-send">🚀 保存并发送通知</button>
     </div>
   </div>
 </div>
@@ -405,6 +451,8 @@
   }
   function lsSave(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
 
+  // 云端元信息（版本号 / 飞书 Webhook），与 systems 同存于 config JSONB
+  const meta = { feishu_webhook: '', version: 'v1.6.0' };
   let systems = lsLoad() || JSON.parse(JSON.stringify(DEFAULT_SYSTEMS));
 
   // 启动后异步拉取云端最新配置（云端优先，本地仅作离线兜底）
@@ -414,11 +462,19 @@
         .from('portal_config').select('config').eq('id', 1).maybeSingle();
       if (!error && data && data.config && Array.isArray(data.config.systems) && data.config.systems.length) {
         systems = data.config.systems;
+        if (typeof data.config.feishu_webhook === 'string') meta.feishu_webhook = data.config.feishu_webhook;
+        if (typeof data.config.version === 'string' && data.config.version) meta.version = data.config.version;
         lsSave(systems);
         render(searchEl.value);
+        document.getElementById('ver-span').textContent = meta.version;
       }
     } catch (e) { /* 云端不可达时沿用本地缓存 */ }
   })();
+
+  // 组装完整云端配置（systems + 元信息），避免保存时互相覆盖
+  function cloudSaveConfig() {
+    return { systems, feishu_webhook: meta.feishu_webhook, version: meta.version };
+  }
 
   const groupsEl = document.getElementById('groups');
   const emptyEl = document.getElementById('empty');
@@ -569,12 +625,23 @@
     openModal('mask-pass');
     setTimeout(() => pwdInput.focus(), 50);
   }
+  // 管理门禁：验证通过后执行传入动作（入口配置 / 飞书通知）
+  let afterAuthFn = null;
+  function requestGate(fn) {
+    if (sessionStorage.getItem(AUTH_KEY) === '1') { fn(); return; }
+    afterAuthFn = fn;
+    pwdInput.value = ''; pwdError.textContent = '';
+    openModal('mask-pass');
+    setTimeout(() => pwdInput.focus(), 50);
+  }
   function tryAuth() {
     if (pwdInput.value === ADMIN_PASS) {
       sessionStorage.setItem(AUTH_KEY, '1');
       sessionStorage.setItem('xy_portal_pass', pwdInput.value);   // 供云端保存调用
       closeModal('mask-pass');
-      openConfig();
+      const fn = afterAuthFn || openConfig;
+      afterAuthFn = null;
+      fn();
     } else {
       pwdError.textContent = '密码错误，请重试';
       pwdInput.classList.remove('err');
@@ -586,7 +653,81 @@
   document.getElementById('pwd-ok').onclick = tryAuth;
   pwdInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
 
-  document.getElementById('btn-config').onclick = requestConfig;
+  document.getElementById('btn-config').onclick = () => requestGate(openConfig);
+
+  /* ── 飞书群通知 ── */
+  const PORTAL_URL = 'https://xiaoyu-portal.app.workbuddy.host/';
+  function openFeishu() {
+    document.getElementById('f-webhook').value = meta.feishu_webhook;
+    document.getElementById('f-version').value = meta.version;
+    document.getElementById('f-note').value = '';
+    openModal('mask-feishu');
+  }
+  document.getElementById('btn-feishu').onclick = () => requestGate(openFeishu);
+
+  function saveFeishuMeta() {
+    meta.feishu_webhook = document.getElementById('f-webhook').value.trim();
+    meta.version = document.getElementById('f-version').value.trim() || meta.version;
+    document.getElementById('ver-span').textContent = meta.version;
+    const pass = sessionStorage.getItem('xy_portal_pass');
+    if (!pass) return Promise.resolve({ error: { message: 'BAD_PASSWORD' } });
+    return cloud.database.rpc('update_portal_config', { p_password: pass, p_config: cloudSaveConfig() });
+  }
+  document.getElementById('f-save-cfg').onclick = () => {
+    saveFeishuMeta().then(({ error }) => {
+      if (error) return toast('保存失败：' + (error.message || '请重新输入密码'));
+      toast('Webhook 配置已保存到云端 ✓');
+    });
+  };
+  document.getElementById('f-send').onclick = () => {
+    const hook = document.getElementById('f-webhook').value.trim();
+    const note = document.getElementById('f-note').value.trim();
+    const version = document.getElementById('f-version').value.trim() || meta.version;
+    if (!hook.startsWith('https://open.feishu.cn/open-apis/bot/v2/hook/'))
+      return toast('请填写正确的飞书机器人 Webhook 地址');
+    if (!note) return toast('请填写更新内容');
+
+    const btn = document.getElementById('f-send');
+    btn.disabled = true; btn.textContent = '发送中…';
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const atAll = document.getElementById('f-atall').checked ? '<at id=all></at>  \n' : '';
+    const payload = {
+      msg_type: 'interactive',
+      card: {
+        config: { wide_screen_mode: true },
+        header: { title: { tag: 'plain_text', content: '🐟 小渔数科内部门户 · 更新通知' }, template: 'blue' },
+        elements: [
+          { tag: 'div', text: { tag: 'lark_md', content: atAll + note.replace(/\n/g, '\n') } },
+          { tag: 'hr' },
+          { tag: 'div', fields: [
+            { is_short: true, text: { tag: 'lark_md', content: '**版本号**\n' + version } },
+            { is_short: true, text: { tag: 'lark_md', content: '**发布时间**\n' + timeStr } }
+          ]},
+          { tag: 'action', actions: [
+            { tag: 'button', text: { tag: 'plain_text', content: '👉 打开门户' }, type: 'primary', url: PORTAL_URL }
+          ]},
+          { tag: 'note', elements: [{ tag: 'plain_text', content: '小渔数科内部门户 · 飞书机器人自动通知' }] }
+        ]
+      }
+    };
+    fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(r => r.json())
+      .then(res => {
+        if (res.code === 0 || res.StatusCode === 0) {
+          meta.version = version;
+          document.getElementById('ver-span').textContent = version;
+          saveFeishuMeta().finally(() => {
+            closeModal('mask-feishu');
+            toast('✅ 已发送到飞书群，版本号已更新为 ' + version);
+          });
+        } else {
+          toast('飞书返回错误：' + (res.msg || res.errmsg || JSON.stringify(res)).slice(0, 60));
+        }
+      })
+      .catch(() => toast('发送失败：网络异常或 Webhook 地址无效'))
+      .finally(() => { btn.disabled = false; btn.textContent = '🚀 保存并发送通知'; });
+  };
   document.getElementById('btn-add').onclick = () => {
     const today = new Date();
     const iso = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
@@ -615,7 +756,7 @@
     toast('已恢复默认配置');
     const pass = sessionStorage.getItem('xy_portal_pass');
     if (pass) {
-      cloud.database.rpc('update_portal_config', { p_password: pass, p_config: { systems } })
+      cloud.database.rpc('update_portal_config', { p_password: pass, p_config: cloudSaveConfig() })
         .then(({ error }) => { if (error) toast('云端恢复失败，请重新保存一次'); });
     }
   };
@@ -630,7 +771,7 @@
       toast('本机已保存，但需重新输入密码才能同步云端');
       return;
     }
-    cloud.database.rpc('update_portal_config', { p_password: pass, p_config: { systems } })
+    cloud.database.rpc('update_portal_config', { p_password: pass, p_config: cloudSaveConfig() })
       .then(({ error }) => {
         closeModal('mask-config');
         if (error) {
